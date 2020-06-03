@@ -1,0 +1,354 @@
+---
+title: "EMBL-EBI SARS-CoV-2 data-ingress"
+output: 
+    flexdashboard::flex_dashboard:
+        theme: flatly
+        social: menu
+        orientation: rows
+        vertical_layout: fill
+        storyboard: true
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(curl)
+library(tidyverse)
+library(maps)
+library(viridis)
+library(ggrepel)
+library(ggstance)
+#library(ggalt)
+library(highcharter)
+library(lubridate)
+library('rjson')
+library(silgelib)
+theme_set(theme_plex())
+
+options(warn=-1)
+
+query<-  "https://www.ebi.ac.uk/ena/portal/api/search?result=read_experiment&query=tax_tree(2697049)%20AND%20experiment_accession%3D%22ERX*%22&fields=center_name,country,scientific_name,instrument_platform,library_layout,instrument_model,collection_date,first_public,sex,host&format=tsv"
+
+
+curl_download(query, 'metadata.tsv')
+metadata <- readr::read_delim(file='metadata.tsv',delim = "\t")
+
+
+# NB: For new center_name to country mapping
+# follow the instruction in the comment section of the code below.
+metadata_clean <- metadata %>% transmute(
+  origin = case_when(
+    str_detect(center_name, fixed('aalborg',ignore_case = TRUE)) ~ 'Denmark',
+    str_detect(center_name, fixed('deepseq',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('fisabio',ignore_case = TRUE)) ~ 'Spain',
+    str_detect(center_name, fixed('DR. RICARDO JORGE',ignore_case = TRUE)) ~ 'Portugal',
+    str_detect(center_name, fixed('Colindale',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Cardiff',ignore_case = TRUE)) ~ 'Wales',
+    str_detect(center_name, fixed('Quadram Institute Bioscience',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('University College London',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('University of Cambridge',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('University of Edinburgh',ignore_case = TRUE)) ~ 'Scotland',
+    str_detect(center_name, fixed('University of Glasgow',ignore_case = TRUE)) ~ 'Scotland',
+    str_detect(center_name, fixed('Liverpool Clinical Laboratories',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('University of Sheffield',ignore_case = TRUE)) ~ 'England',
+    # FOR NEW CENTER_NAME to COUNTRY MAPPING, un-comment  and fill in the following template
+    #str_detect(center_name, fixed('CENTER_NAME',ignore_case = TRUE)) ~ 'COUNTRY'),
+    TRUE ~ ifelse (!is.na(country), country, center_name)),
+  country, experiment_accession, sample_accession, center_name, scientific_name,
+  instrument_platform, library_layout, instrument_model, collection_date, first_public, sex, host
+) %>%
+  mutate_if(is.character, factor)
+
+
+# few european countries
+eu <- c(
+  "Portugal", "Spain", "France", "Switzerland", "Germany",
+  "Austria", "Belgium", "UK", "Netherlands",
+  "Denmark", "Poland", "Italy",
+  "Croatia", "Slovenia", "Hungary", "Slovakia",
+  "Czech republic"
+)
+# Retrieve the map data
+eu.map <- map_data("world", region = eu)
+world.map <- map_data("world")
+
+# Compute the centroid as the mean longitude and lattitude
+# Used as label coordinate for country's names
+eu.lab <- eu.map %>%
+  group_by(region) %>%
+  summarise(long = mean(long), lat = mean(lat))
+
+
+uk_states <- eu.map%>% filter(str_detect('UK', region)) %>%
+  group_by(subregion) %>%
+  summarize(long=mean(long), lat=mean(lat)) %>%
+  rename(region=subregion)
+uk_states <- bind_rows(uk_states ,tibble(data.frame(region='England', lat=52, long=0.12)))
+
+eu_countries <- eu.map %>% filter(!str_detect('UK', region)) %>%
+  group_by(region) %>%
+  summarize(long=mean(long), lat=mean(lat))
+
+geo_loc <- bind_rows(uk_states, eu_countries)
+
+meta_df <- metadata_clean %>% count(origin, sort=TRUE) %>% rename(region=origin)
+
+hits <- inner_join(geo_loc, meta_df)
+
+
+```
+
+
+# Maps {data-icon="fa-map-marker"} 
+
+Row
+-----------------------------------------------------------------------
+
+### Total Experiments {.value-box}
+
+```{r}
+exp_count <- metadata_clean %>% select(experiment_accession) %>% distinct %>% count() %>% as.numeric()
+valueBox(exp_count, icon="ion-ios-flask-outline")
+```
+
+### Submission centers {.value-box}
+
+```{r}
+center_count <- metadata_clean %>% select(center_name) %>% distinct %>% count() %>% as.numeric()
+valueBox(center_count, icon="ion-ios-people-outline")
+```
+
+
+### Instrument models 
+
+```{r}
+models_count <- metadata_clean %>% select(instrument_model) %>% distinct ()%>% count() %>% as.numeric()
+valueBox(models_count, icon="ion-paintbucket")
+```
+
+
+
+### Instrument Platforms 
+
+```{r}
+platform_count <- metadata_clean %>% select(instrument_platform) %>% distinct ()%>% count() %>% as.numeric()
+valueBox(platform_count, icon="ion-paintbucket")
+```
+
+
+## Row  {.tabset .tabset-fade}
+
+### Europe
+
+```{r}
+source('file_export_for_dashboards.R')
+json_file='https://code.highcharts.com/mapdata/custom/european-union.geo.json'
+json_data <- fromJSON(paste(readLines(json_file), collapse=""))
+
+subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
+    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
+    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
+    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
+    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
+    mutate(country=as.factor(country)) %>%
+    count(country) %>% filter(!is.na(country))
+
+hc <- highchart() %>%
+  hc_add_series_map(
+    json_data , subset_data , value = "n", joinBy = c('name','country'),
+    name = "CovidSubmission"
+    )  %>% 
+  hc_colorAxis(stops = color_stops()) %>%
+      hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+hc
+```
+
+
+
+### World
+
+```{r}
+source('file_export_for_dashboards.R')
+data(worldgeojson, package = "highcharter")
+subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
+    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
+    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
+    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
+    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
+    mutate(country=as.factor(country)) %>%
+    count(country) %>% filter(!is.na(country))
+
+hc <- highchart() %>%
+  hc_add_series_map(
+    worldgeojson , subset_data , value = "n", joinBy = c('name','country'),
+    name = "CovidSubmission"
+    )  %>% 
+  hc_colorAxis(stops = color_stops()) %>%
+      hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+hc
+```
+
+
+### Europe2
+
+
+```{r, fig.height=7, fig.width=9}
+
+ggplot() + 
+  geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
+  geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
+  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
+  stat_summary_hex(
+    data=hits,
+    aes(long, lat, z=as.integer(n)),
+    fun ="mean",
+    alpha = 0.7
+  ) +
+  scale_fill_gradient(high="cyan3", labels= scales::comma) +
+  theme_void(base_family = "IBMPlexSans") + 
+  labs(x=NULL, y=NULL, fill=NULL) + 
+  theme(plot.title= element_text(hjust=.5), 
+        legend.position = "bottom")
+
+```
+
+### World2
+
+```{r, fig.height=7, fig.width=9}
+
+ggplot() + 
+  geom_map(data=world.map, map=world.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
+  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5, colour='slateblue', show.legend=TRUE)+
+  geom_point(data=hits, aes(x=long, y=lat ,size=n), alpha=.6, colour='red')+
+  scale_fill_gradient(high="cyan3", labels= scales::comma) +
+  theme_void(base_family = "IBMPlexSans") + 
+  labs(x=NULL, y=NULL, fill="Number of\n samples")  + 
+  theme(legend.position = "none")
+
+
+```
+
+# Releases {data-icon="fa-calendar"} 
+
+## Row {.tabset .tabset-fade}
+
+### Overall
+
+```{r, fig.height=7, fig.width=9}
+source('file_export_for_dashboards.R')
+
+metadata_clean %>% count(first_public, origin) %>% hchart("column", hcaes(x=first_public , y=n, group=origin)) %>%
+    hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+```
+
+### Month
+
+```{r, fig.height=7, fig.width=9}
+metadata_clean %>% 
+    mutate(monthly=floor_date(first_public, unit="month")) %>%
+    count(monthly, origin) %>% 
+    hchart("column", hcaes(x= monthly, y=n, group=origin))%>%
+    hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+
+```
+
+
+### Week
+
+```{r, fig.height=7, fig.width=9}
+
+metadata_clean %>% 
+    mutate(weekly=week(first_public)) %>%
+    count(weekly, origin) %>% 
+    hchart("column", hcaes(x= weekly, y=n, group=origin))%>%
+    hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+
+
+```
+
+Platforms {data-icon="ion-erlenmeyer-flask"}
+=====================================     
+
+## Row {.tabset .tabset-fade}
+
+### Instrument model 
+
+```{r}
+
+metadata_clean %>% count(instrument_model, instrument_platform) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col() + coord_flip() 
+```
+
+### Instrument platforms 
+
+```{r}
+
+metadata_clean %>% count(instrument_model, instrument_platform, library_layout) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col( show.legend = FALSE) + coord_flip() + facet_grid(library_layout~instrument_platform, scales="free_x")
+```
+
+
+
+Datasets {data-icon="ion-ios-cloud-download-outline"}
+=====================================     
+
+## DT::datatable {.tabset .tabset-fade}
+
+### Basic
+
+```{r}
+library(DT)
+datatable(metadata_clean)
+```          
+
+### Advanced
+
+```{r}
+
+datatable(metadata_clean, filter = 'top',  
+          options = list(   searchHighlight = TRUE, pageLength = 15 ))
+
+```
+
+
+### Exporting
+
+```{r}
+library(DT)
+
+metadata_clean %>% datatable( extensions = 'Buttons',  
+                              options = list(  dom = 'Bfrtip',
+                                               buttons = list( list(
+                                               extend = 'collection',
+                                        buttons = list(list(extend='csv',filename='embl-ebi-covid-submission.csv'),                                                                 list(extend='excel', filename = 'embl-ebi-covid-submission.xlsx')),text="Download"
+                                            ))))
+
+```
+
