@@ -63,7 +63,7 @@ metadata_clean <- metadata %>% transmute(
 eu <- c(
   "Portugal", "Spain", "France", "Switzerland", "Germany",
   "Austria", "Belgium", "UK", "Netherlands",
-  "Denmark", "Poland", "Italy",
+  "Denmark", "Norway","Finland","Sweden","Israel","Ireland","Malta","Poland", "Italy",
   "Croatia", "Slovenia", "Hungary", "Slovakia",
   "Czech republic"
 )
