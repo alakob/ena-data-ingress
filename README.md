@@ -11,8 +11,8 @@ The open-source software Docker must be pre-installed for the proper functioning
 #### 1. Step 1
 
 ```
-git clone https://github.com/alakob/ena-data-ingress-dashboard.git \
-    && cd ena-data-ingress-dashboard \
+git clone https://github.com/alakob/ena-data-ingress.git \
+    && cd ena-data-ingress \
     && docker build --tag sarscov2 .
 ```
 
