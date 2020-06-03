@@ -4,7 +4,7 @@ An interactive dashboard to visualize SARS-CoV2 data submission to the EMBL-EBI-
 
 ### Prerequisite.
 
-The open-source software Docker must be pre-installed for the proper functioning of the Metagen-FastQC docker version:  
+The open-source software Docker must be pre-installed for the proper functioning of the dashboard:  
 [Follow instruction for setting up docker in your machine](https://github.com/EBI-COMMUNITY/ebi-selecta#SELECTA-framework-Docker-Compose-version)
 
 ### Get and build the ena-data-ingress dashboard image.
