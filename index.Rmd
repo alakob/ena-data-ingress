@@ -150,7 +150,8 @@ ggplot() +
     data=hits,
     aes(long, lat, z=as.integer(n)),
     fun ="mean",
-    alpha = 0.7
+    alpha = 0.7, 
+    bins=80
   ) +
   scale_fill_gradient(high="cyan3", labels= scales::comma) +
   theme_void(base_family = "IBMPlexSans") + 
