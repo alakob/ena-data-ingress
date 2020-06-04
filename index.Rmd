@@ -139,35 +139,26 @@ valueBox(platform_count, icon="ion-paintbucket")
 
 ### Europe
 
-```{r}
-source('file_export_for_dashboards.R')
-json_file='https://code.highcharts.com/mapdata/custom/european-union.geo.json'
-json_data <- fromJSON(paste(readLines(json_file), collapse=""))
 
-subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
-    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
-    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
-    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
-    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
-    mutate(country=as.factor(country)) %>%
-    count(country) %>% filter(!is.na(country))
+```{r, fig.height=7, fig.width=9}
 
-hc <- highchart() %>%
-  hc_add_series_map(
-    json_data , subset_data , value = "n", joinBy = c('name','country'),
-    name = "CovidSubmission"
-    )  %>% 
-  hc_colorAxis(stops = color_stops()) %>%
-      hc_exporting(
-    enabled = TRUE, 
-    filename="simple_column", 
-    formAttributes=list(target="_blank"),
-    buttons=list(contextButton=list(text="Export", 
-                                    theme=list(fill="transparent"),
-                                    menuItems=export)))
-hc
+ggplot() + 
+  geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
+  geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
+  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
+  stat_summary_hex(
+    data=hits,
+    aes(long, lat, z=as.integer(n)),
+    fun ="mean",
+    alpha = 0.7
+  ) +
+  scale_fill_gradient(high="cyan3", labels= scales::comma) +
+  theme_void(base_family = "IBMPlexSans") + 
+  labs(x=NULL, y=NULL, fill=NULL) + 
+  theme(plot.title= element_text(hjust=.5), 
+        legend.position = "bottom")
+
 ```
-
 
 
 ### World
@@ -203,25 +194,36 @@ hc
 ### Europe2
 
 
-```{r, fig.height=7, fig.width=9}
+```{r}
+source('file_export_for_dashboards.R')
+json_file='https://code.highcharts.com/mapdata/custom/european-union.geo.json'
+json_data <- fromJSON(paste(readLines(json_file), collapse=""))
 
-ggplot() + 
-  geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
-  geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
-  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
-  stat_summary_hex(
-    data=hits,
-    aes(long, lat, z=as.integer(n)),
-    fun ="mean",
-    alpha = 0.7
-  ) +
-  scale_fill_gradient(high="cyan3", labels= scales::comma) +
-  theme_void(base_family = "IBMPlexSans") + 
-  labs(x=NULL, y=NULL, fill=NULL) + 
-  theme(plot.title= element_text(hjust=.5), 
-        legend.position = "bottom")
+subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
+    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
+    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
+    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
+    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
+    mutate(country=as.factor(country)) %>%
+    count(country) %>% filter(!is.na(country))
 
+hc <- highchart() %>%
+  hc_add_series_map(
+    json_data , subset_data , value = "n", joinBy = c('name','country'),
+    name = "CovidSubmission"
+    )  %>% 
+  hc_colorAxis(stops = color_stops()) %>%
+      hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+hc
 ```
+
+
 
 ### World2
 
