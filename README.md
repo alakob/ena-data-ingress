@@ -27,4 +27,6 @@ docker run --rm -v "$PWD":/home/jovyan/work/R sarscov2:latest R -e "rmarkdown::r
 ### Open the dashboard (index.html) with a web browser
 
 Tested with Mozilla Firefox, Google Chrome
-
+```
+index.html: Included in this repos, an interactive Dashboard example 
+```
