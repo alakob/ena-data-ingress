@@ -273,8 +273,6 @@ metadata_clean %>% count(center_name, origin) %>% arrange(desc(n)) %>% mutate(ce
 ```
 
 
-
-
 # Timeline {data-icon="fa-calendar"} 
 
 ## Row {.tabset .tabset-fade}
