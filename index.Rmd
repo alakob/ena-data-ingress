@@ -50,6 +50,9 @@ metadata_clean <- metadata %>% transmute(
     str_detect(center_name, fixed('University of Glasgow',ignore_case = TRUE)) ~ 'Scotland',
     str_detect(center_name, fixed('Liverpool Clinical Laboratories',ignore_case = TRUE)) ~ 'England',
     str_detect(center_name, fixed('University of Sheffield',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Belfast Health',ignore_case = TRUE)) ~ 'Northern Ireland',
+    str_detect(center_name, fixed('University of Birmingham',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('University of Exeter',ignore_case = TRUE)) ~ 'England',
     # FOR NEW CENTER_NAME to COUNTRY MAPPING, un-comment  and fill in the following template
     #str_detect(center_name, fixed('CENTER_NAME',ignore_case = TRUE)) ~ 'COUNTRY'),
     TRUE ~ ifelse (!is.na(country), country, center_name)),
@@ -94,7 +97,10 @@ meta_df <- metadata_clean %>% count(origin, sort=TRUE) %>% rename(region=origin)
 
 hits <- inner_join(geo_loc, meta_df)
 
-
+world.center  <- world.map %>%  group_by(region) %>%
+        summarize(long=mean(long), lat=mean(lat))
+world.center <- bind_rows(world.center, uk_states) 
+whits <- inner_join(world.center, meta_df)
 ```
 
 
@@ -146,7 +152,7 @@ mylabel=paste(gsub("000","",mybreak),"K", sep="")
 ggplot() + 
   geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
   geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
-  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
+  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), size=2, alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
   stat_summary_hex(
     data=hits,
     aes(long, lat, z=as.integer(n)),
@@ -167,7 +173,7 @@ ggplot() +
 ### World
 
 ```{r}
-source('file_export_for_dashboards.R')
+source('fileexport.R')
 data(worldgeojson, package = "highcharter")
 subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
     mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
@@ -198,7 +204,7 @@ hc
 
 
 ```{r}
-source('file_export_for_dashboards.R')
+source('fileexport.R')
 json_file='https://code.highcharts.com/mapdata/custom/european-union.geo.json'
 json_data <- fromJSON(paste(readLines(json_file), collapse=""))
 
@@ -234,8 +240,8 @@ hc
 
 ggplot() + 
   geom_map(data=world.map, map=world.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
-  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5, colour='slateblue', show.legend=TRUE)+
-  geom_point(data=hits, aes(x=long, y=lat ,size=n), alpha=.6, colour='red')+
+  geom_label_repel(data=whits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5, colour='slateblue', show.legend=TRUE)+
+  geom_point(data=whits, aes(x=long, y=lat ,size=n), size=2, alpha=.6, colour='red')+
   scale_fill_gradient(high="cyan3", labels= scales::comma) +
   theme_void(base_family = "IBMPlexSans") + 
   labs(x=NULL, y=NULL, fill="Number of\n samples")  + 
@@ -244,6 +250,31 @@ ggplot() +
 
 ```
 
+
+
+# Center Names {data-icon="ion-ios-people-outline"} 
+
+## Row {.tabset .tabset-fade}
+
+### Submission Centers
+
+```{r, fig.height=7, fig.width=9}
+source('fileexport.R')
+
+metadata_clean %>% count(center_name, origin) %>% arrange(desc(n)) %>% mutate(center_name =fct_reorder(center_name, n)) %>%
+  hchart("bar", hcaes(x=center_name , y=n, group=origin)) %>% 
+  hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+```
+
+
+
+
 # Releases {data-icon="fa-calendar"} 
 
 ## Row {.tabset .tabset-fade}
@@ -251,7 +282,7 @@ ggplot() +
 ### Overall
 
 ```{r, fig.height=7, fig.width=9}
-source('file_export_for_dashboards.R')
+source('fileexport.R')
 
 metadata_clean %>% count(first_public, origin) %>% hchart("column", hcaes(x=first_public , y=n, group=origin)) %>%
     hc_exporting(
