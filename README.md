@@ -21,7 +21,7 @@ git clone https://github.com/alakob/ena-data-ingress.git \
 #### 2. Step 2
 
 ```
-docker run --rm -v "$PWD":/home/jovyan/work/R sarscov2:latest R -e "rmarkdown::render('index.Rmd')"
+docker run --rm -v ${PWD}:/home/jovyan/work/R sarscov2:latest R -e "rmarkdown::render('index.Rmd')"
 ```
 
 ### Open the dashboard (index.html) with a web browser
