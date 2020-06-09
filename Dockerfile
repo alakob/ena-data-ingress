@@ -1,8 +1,20 @@
-FROM jupyter/r-notebook
+ARG BASE_CONTAINER=jupyter/r-notebook
 
-LABEL Author="Blaise Alako" Email="blaise@ebi.ac.uk"
+ARG DESCRIPTION="ENA data-ingress dashboard"
 
-LABEL Description="ENA data-ingress dashboard" Vendor="EMBL-EBI" Version="1.0"
+ARG VENDOR="EMBL-EBI"
+
+ARG VERSION="1.0"
+
+ARG AUTHOR="Blaise Alako"
+
+ARG EMAIL="blaise@ebi.ac.uk"
+
+FROM ${BASE_CONTAINER}
+
+LABEL Author=${AUTHOR} Email=${EMAIL}
+
+LABEL Description=${DESCRIPTION} Vendor=${VENDOR} Version=${VERSION}
 
 RUN mkdir -p /home/jovyan/work/R
 
