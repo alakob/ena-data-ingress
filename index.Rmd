@@ -101,6 +101,16 @@ world.center  <- world.map %>%  group_by(region) %>%
         summarize(long=mean(long), lat=mean(lat))
 world.center <- bind_rows(world.center, uk_states) 
 whits <- inner_join(world.center, meta_df)
+
+# Construct URL to ENA for each experiment.
+#path <- "http://www.ebi.ac.uk/ena/data/view/"
+path <- "https://www.ebi.ac.uk/ena/browser/view/"
+experiment_accession <- metadata_clean$experiment_accession
+sample_accession <- metadata_clean$sample_accession
+experiment_accession =  paste0('<a target=_blank href="',path, experiment_accession,'">', experiment_accession,'</a>' )
+sample_accession =  paste0('<a target=_blank href="',path, sample_accession,'">', sample_accession,'</a>' )
+metadata_clean$experiment_accession <- experiment_accession
+metadata_clean$sample_accession <- sample_accession
 ```
 
 
@@ -359,14 +369,14 @@ Datasets {data-icon="ion-ios-cloud-download-outline"}
 
 ```{r}
 library(DT)
-datatable(metadata_clean)
+datatable(metadata_clean, escape=FALSE)
 ```          
 
 ### Advanced
 
 ```{r}
 
-datatable(metadata_clean, filter = 'top',  
+datatable(metadata_clean, filter = 'top',  escape=FALSE,
           options = list(   searchHighlight = TRUE, pageLength = 15 ))
 
 ```
@@ -377,7 +387,7 @@ datatable(metadata_clean, filter = 'top',
 ```{r}
 library(DT)
 
-metadata_clean %>% datatable( extensions = 'Buttons',  
+metadata_clean %>% datatable( extensions = 'Buttons',  escape=FALSE,
                               options = list(  dom = 'Bfrtip',
                                                buttons = list( list(
                                                extend = 'collection',
