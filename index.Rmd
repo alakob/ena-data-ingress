@@ -26,16 +26,68 @@ theme_set(theme_plex())
 
 options(warn=-1)
 
-query<-  "https://www.ebi.ac.uk/ena/portal/api/search?result=read_experiment&query=tax_tree(2697049)%20AND%20experiment_accession%3D%22ERX*%22&fields=center_name,country,scientific_name,instrument_platform,library_layout,instrument_model,collection_date,first_public,sex,host&format=tsv"
+# Query ENA API
+experiment<-  "https://www.ebi.ac.uk/ena/portal/api/search?result=read_experiment&query=tax_tree(2697049)&fields=center_name,country,scientific_name,instrument_platform,library_layout,instrument_model,collection_date,first_public,sex,host&format=tsv"
+
+sequence_release_full <- "https://www.ebi.ac.uk/ena/portal/api/search?result=sequence_release&query=tax_tree(2697049)&fields=accession,study_accession,sample_accession,tax_id,scientific_name,base_count,bio_material,cell_line,cell_type,collected_by,collection_date,country,cultivar,culture_collection,dataclass,description,dev_stage,ecotype,environmental_sample,first_public,germline,host,identified_by,isolate,isolation_source,keywords,lab_host,last_updated,location,mating_type,mol_type,organelle,serotype,serovar,sex,submitted_sex,specimen_voucher,strain,sub_species,sub_strain,tax_division,tissue_lib,tissue_type,topology,variety,altitude,haplotype,plasmid,sequence_md5&format=tsv"
 
 
-curl_download(query, 'metadata.tsv')
-metadata <- readr::read_delim(file='metadata.tsv',delim = "\t")
+sequence_update_full <- "https://www.ebi.ac.uk/ena/portal/api/search?result=sequence_update&query=tax_tree(2697049)&fields=accession,study_accession,sample_accession,tax_id,scientific_name,base_count,bio_material,cell_line,cell_type,collected_by,collection_date,country,cultivar,culture_collection,dataclass,description,dev_stage,ecotype,environmental_sample,first_public,germline,host,identified_by,isolate,isolation_source,keywords,lab_host,last_updated,location,mating_type,mol_type,organelle,serotype,serovar,sex,submitted_sex,specimen_voucher,strain,sub_species,sub_strain,tax_division,tissue_lib,tissue_type,topology,variety,altitude,haplotype,plasmid,sequence_md5&format=tsv"
+
+sequence_release <- "https://www.ebi.ac.uk/ena/portal/api/search?result=sequence_release&query=tax_tree(2697049)&fields=accession,study_accession,sample_accession,tax_id,scientific_name,collected_by,collection_date,country,first_public,last_updated,location&format=tsv"
+
+
+sequence_update <- "https://www.ebi.ac.uk/ena/portal/api/search?result=sequence_update&query=tax_tree(2697049)&fields=accession,study_accession,sample_accession,tax_id,scientific_name,collected_by,collection_date,country,first_public,last_updated,location&format=tsv"
+
+
+# Download metadata
+curl_download(experiment, 'experiment.tsv')
+curl_download(sequence_release, 'seq_release.tsv')
+curl_download(sequence_update, 'seq_update.tsv')
+# Read in the metadata
+experiment <- readr::read_delim(file='experiment.tsv',delim = "\t")
+seqrelease <- readr::read_delim(file='seq_release.tsv',delim = "\t")
+sequpdate <- readr::read_delim(file='seq_update.tsv',delim = "\t")
+
+seqrelease <- seqrelease %>% mutate(country=gsub(":.*","", country)) %>%
+  select(accession, study_accession, sample_accession,country, first_public, last_updated ) %>% 
+  mutate(INSDC = case_when(
+    str_detect(study_accession,fixed('PRJEB', ignore_case = TRUE)) ~ 'EBI', 
+    str_detect(study_accession, fixed('PRJNA',ignore_case = TRUE))~'NCBI', 
+    str_detect(study_accession, fixed('PRJDA', ignore_case=TRUE))~'DDBJ')) %>%
+  mutate(INSDC = case_when(
+    str_detect(sample_accession,fixed('SAMEA', ignore_case = TRUE)) ~ 'EBI', 
+    str_detect(sample_accession, fixed('SAMN',ignore_case = TRUE))~'NCBI', 
+    str_detect(sample_accession, fixed('SAMD', ignore_case=TRUE))~'DDBJ',
+    TRUE ~ INSDC )) %>%
+   mutate(
+    country = case_when(
+    str_detect(country, fixed('USA',ignore_case = TRUE)) ~ 'United States',
+    TRUE ~ country
+  )) 
+
+
+sequpdate <- sequpdate %>% mutate(country=gsub(":.*","", country)) %>%
+  select(accession, study_accession, sample_accession,country, first_public, last_updated ) %>% 
+  mutate(INSDC = case_when(
+    str_detect(study_accession,fixed('PRJEB', ignore_case = TRUE)) ~ 'EBI', 
+    str_detect(study_accession, fixed('PRJNA',ignore_case = TRUE))~'NCBI', 
+    str_detect(study_accession, fixed('PRJDA', ignore_case=TRUE))~'DDBJ')) %>%
+  mutate(INSDC = case_when(
+    str_detect(sample_accession,fixed('SAMEA', ignore_case = TRUE)) ~ 'EBI', 
+    str_detect(sample_accession, fixed('SAMN',ignore_case = TRUE))~'NCBI', 
+    str_detect(sample_accession, fixed('SAMD', ignore_case=TRUE))~'DDBJ',
+    TRUE ~ INSDC )) %>%
+   mutate(
+    country = case_when(
+    str_detect(country, fixed('USA',ignore_case = TRUE)) ~ 'United States',
+    TRUE ~ country
+  )) 
 
 
 # NB: For new center_name to country mapping
 # follow the instruction in the comment section of the code below.
-metadata_clean <- metadata %>% transmute(
+experiment_clean <- experiment %>% mutate(country=gsub(":.*","", country)) %>% transmute(
   origin = case_when(
     str_detect(center_name, fixed('aalborg',ignore_case = TRUE)) ~ 'Denmark',
     str_detect(center_name, fixed('deepseq',ignore_case = TRUE)) ~ 'England',
@@ -59,7 +111,22 @@ metadata_clean <- metadata %>% transmute(
   country, experiment_accession, sample_accession, center_name, scientific_name,
   instrument_platform, library_layout, instrument_model, collection_date, first_public, sex, host
 ) %>%
+  mutate(insdc= case_when(
+    str_detect(experiment_accession, fixed('ERX', ignore_case = TRUE)) ~ "EBI",
+    str_detect(experiment_accession, fixed('SRX', ignore_case = TRUE)) ~ "NCBI",   
+    str_detect(experiment_accession, fixed('DRX', ignore_case = TRUE)) ~ "DDBJ",
+    TRUE ~ 'Others'
+  )) %>%
+  mutate(
+    country = case_when(
+    str_detect(country, fixed('USA',ignore_case = TRUE)) ~ 'United States',
+    TRUE ~ country
+  ),
+  origin =  case_when(
+    str_detect(origin, fixed('USA',ignore_case = TRUE)) ~ 'United States',
+    TRUE ~ origin)) %>%
   mutate_if(is.character, factor)
+
 
 
 # few european countries
@@ -67,20 +134,24 @@ eu <- c(
   "Portugal", "Spain", "France", "Switzerland", "Germany",
   "Austria", "Belgium", "UK", "Netherlands",
   "Denmark", "Norway","Finland","Sweden","Israel","Ireland","Malta","Poland", "Italy",
-  "Croatia", "Slovenia", "Hungary", "Slovakia",
-  "Czech republic"
+  "Croatia", "Slovenia", "Hungary", "Slovakia","Greece","Iceland","Luxembourg","Malta","Hungary","Slovakia", "Montenegro","Poland","Lithuania","Czech republic"
 )
+                                                                                                                                                                                                                                                                                          
 # Retrieve the map data
 eu.map <- map_data("world", region = eu)
 world.map <- map_data("world")
+states <- map_data("state")
 
-# Compute the centroid as the mean longitude and lattitude
+
+# Compute the centroid as the mean longitude and latitude
 # Used as label coordinate for country's names
 eu.lab <- eu.map %>%
   group_by(region) %>%
   summarise(long = mean(long), lat = mean(lat))
 
-
+states.lab <- states %>%
+  summarise(region="United States", long = mean(long), lat = mean(lat))
+  
 uk_states <- eu.map%>% filter(str_detect('UK', region)) %>%
   group_by(subregion) %>%
   summarize(long=mean(long), lat=mean(lat)) %>%
@@ -93,24 +164,28 @@ eu_countries <- eu.map %>% filter(!str_detect('UK', region)) %>%
 
 geo_loc <- bind_rows(uk_states, eu_countries)
 
-meta_df <- metadata_clean %>% count(origin, sort=TRUE) %>% rename(region=origin)
+meta_df <- experiment_clean %>% count(origin,insdc, sort=TRUE) %>% rename(region=origin)
+
 
 hits <- inner_join(geo_loc, meta_df)
+
 
 world.center  <- world.map %>%  group_by(region) %>%
         summarize(long=mean(long), lat=mean(lat))
 world.center <- bind_rows(world.center, uk_states) 
-whits <- inner_join(world.center, meta_df)
+whits <- inner_join(bind_rows(world.center,states.lab), meta_df)
+
+
 
 # Construct URL to ENA for each experiment.
 #path <- "http://www.ebi.ac.uk/ena/data/view/"
 path <- "https://www.ebi.ac.uk/ena/browser/view/"
-experiment_accession <- metadata_clean$experiment_accession
-sample_accession <- metadata_clean$sample_accession
+experiment_accession <- experiment_clean$experiment_accession
+sample_accession <- experiment_clean$sample_accession
 experiment_accession =  paste0('<a target=_blank href="',path, experiment_accession,'">', experiment_accession,'</a>' )
 sample_accession =  paste0('<a target=_blank href="',path, sample_accession,'">', sample_accession,'</a>' )
-metadata_clean$experiment_accession <- experiment_accession
-metadata_clean$sample_accession <- sample_accession
+experiment_clean$experiment_accession <- experiment_accession
+experiment_clean$sample_accession <- sample_accession
 ```
 
 
@@ -122,14 +197,29 @@ Row
 ### Total Experiments {.value-box}
 
 ```{r}
-exp_count <- metadata_clean %>% select(experiment_accession) %>% distinct %>% count() %>% as.numeric()
+exp_count <- experiment_clean %>% select(experiment_accession) %>% distinct %>% count() %>% as.numeric()
 valueBox(exp_count, icon="ion-ios-flask-outline")
 ```
+
+### Sequence Release {.value-box}
+
+```{r}
+seqrelease_count <- seqrelease %>% select(accession) %>% distinct %>% count() %>% as.numeric()
+valueBox(seqrelease_count, icon="ion-ios-flask-outline")
+```
+
+### Sequence Updates {.value-box}
+
+```{r}
+sequpdate_count <- sequpdate %>% select(accession) %>% distinct %>% count() %>% as.numeric()
+valueBox(sequpdate_count, icon="ion-ios-flask-outline")
+```
+
 
 ### Submission centers {.value-box}
 
 ```{r}
-center_count <- metadata_clean %>% select(center_name) %>% distinct %>% count() %>% as.numeric()
+center_count <- experiment_clean %>% select(center_name) %>% distinct %>% count() %>% as.numeric()
 valueBox(center_count, icon="ion-ios-people-outline")
 ```
 
@@ -137,7 +227,7 @@ valueBox(center_count, icon="ion-ios-people-outline")
 ### Instrument models 
 
 ```{r}
-models_count <- metadata_clean %>% select(instrument_model) %>% distinct ()%>% count() %>% as.numeric()
+models_count <- experiment_clean %>% select(instrument_model) %>% distinct ()%>% count() %>% as.numeric()
 valueBox(models_count, icon="ion-paintbucket")
 ```
 
@@ -146,144 +236,137 @@ valueBox(models_count, icon="ion-paintbucket")
 ### Instrument Platforms 
 
 ```{r}
-platform_count <- metadata_clean %>% select(instrument_platform) %>% distinct ()%>% count() %>% as.numeric()
+platform_count <- experiment_clean %>% select(instrument_platform) %>% distinct ()%>% count() %>% as.numeric()
 valueBox(platform_count, icon="ion-paintbucket")
 ```
 
 
 ## Row  {.tabset .tabset-fade}
 
-### Europe
+### Europe Experiment
 
 
 ```{r, fig.height=7, fig.width=9}
-mybreak=seq(0,nrow(metadata_clean),2000)
+mybreak=seq(0,nrow(experiment_clean),2000)
 mylabel=paste(gsub("000","",mybreak),"K", sep="")
-ggplot() + 
+ggplot() +
   geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
   geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
-  geom_label_repel(data=hits, aes(x=long, y=lat ,label=n), size=2, alpha=.9, box.padding = 0.5,colour='slateblue', show.legend=TRUE)+
+  geom_label_repel(data=hits, aes(x=long, y=lat , colour=insdc,label=n), size=2, alpha=.9, box.padding = 0.3, show.legend=T)+
+  guides(shape=FALSE) +
   stat_summary_hex(
     data=hits,
     aes(long, lat, z=as.integer(n)),
     fun ="mean",
     alpha = 0.7, 
-    bins=80
+    bins=90
   ) +
-  #scale_fill_gradient(high="cyan3",labels=scales::comma) +
-  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) +
+  scale_fill_gradient(high="cyan2", breaks=mybreak, labels=mylabel) + #ggthemes::theme_map() +
   theme_void(base_family = "IBMPlexSans") + 
-  labs(x=NULL, y=NULL, fill=NULL) + 
+  labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL ) + 
   theme(plot.title= element_text(hjust=.5), 
-        legend.position = "bottom")
-
+        legend.position = "bottom",
+        legend.text=element_text(size=rel(0.5))) 
 ```
 
-
-### World
-
-```{r}
-source('fileexport.R')
-data(worldgeojson, package = "highcharter")
-subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
-    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
-    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
-    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
-    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
-    mutate(country=as.factor(country)) %>%
-    count(country) %>% filter(!is.na(country))
-
-hc <- highchart() %>%
-  hc_add_series_map(
-    worldgeojson , subset_data , value = "n", joinBy = c('name','country'),
-    name = "CovidSubmission"
-    )  %>% 
-  hc_colorAxis(stops = color_stops()) %>%
-      hc_exporting(
-    enabled = TRUE, 
-    filename="simple_column", 
-    formAttributes=list(target="_blank"),
-    buttons=list(contextButton=list(text="Export", 
-                                    theme=list(fill="transparent"),
-                                    menuItems=export)))
-hc
-```
-
-
-### Europe2
-
-
-```{r}
-source('fileexport.R')
-json_file='https://code.highcharts.com/mapdata/custom/european-union.geo.json'
-json_data <- fromJSON(paste(readLines(json_file), collapse=""))
-
-subset_data <-  metadata_clean %>% mutate(origin=as.character(origin), country=as.character(country)) %>%
-    mutate(country = ifelse(origin=="Scotland", "United Kingdom", country)) %>% 
-    mutate (country = ifelse(origin=="England", "United Kingdom", country))%>%
-    mutate (country = ifelse(origin=="Wales", "United Kingdom", country))%>%
-    mutate(country = ifelse(origin =="Spain", origin, country)) %>%
-    mutate(country=as.factor(country)) %>%
-    count(country) %>% filter(!is.na(country))
-
-hc <- highchart() %>%
-  hc_add_series_map(
-    json_data , subset_data , value = "n", joinBy = c('name','country'),
-    name = "CovidSubmission"
-    )  %>% 
-  hc_colorAxis(stops = color_stops()) %>%
-      hc_exporting(
-    enabled = TRUE, 
-    filename="simple_column", 
-    formAttributes=list(target="_blank"),
-    buttons=list(contextButton=list(text="Export", 
-                                    theme=list(fill="transparent"),
-                                    menuItems=export)))
-hc
-```
-
-
-
-### World2
+### World Experiment
 
 ```{r, fig.height=7, fig.width=9}
+mybreak=seq(0,nrow(experiment_clean),2000)
+mylabel=paste(gsub("000","",mybreak),"K", sep="")
 
 ggplot() + 
   geom_map(data=world.map, map=world.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
-  geom_label_repel(data=whits, aes(x=long, y=lat ,label=n), alpha=.9, box.padding = 0.5, colour='slateblue', show.legend=TRUE)+
-  geom_point(data=whits, aes(x=long, y=lat ,size=n), size=2, alpha=.6, colour='red')+
-  scale_fill_gradient(high="cyan3", labels= scales::comma) +
-  theme_void(base_family = "IBMPlexSans") + 
-  labs(x=NULL, y=NULL, fill="Number of\n samples")  + 
-  theme(legend.position = "none")
+  #geom_label_repel(data=whits, aes(x=long, y=lat ,label=n, colour=insdc, shape = insdc), alpha=.9, box.padding = 0.5)+
+  geom_label_repel(data=whits, aes(x=long, y=lat , colour=insdc,label=n), size=2, alpha=.9, box.padding = 0.3, show.legend=T)+
+  guides(shape=FALSE) +
+  stat_summary_hex(
+    data=whits,
+    aes(long, lat, z=as.integer(n)),
+    fun ="mean",
+    alpha = 0.7, 
+    bins=90
+  ) +
+  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + ggthemes::theme_map() +
+  theme_void(base_family = "IBMPlexSans")+ 
+  labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL) + 
+  theme(plot.title= element_text(hjust=.5), 
+        legend.position = "bottom",
+        legend.text=element_text(size=rel(0.5))) #+ facet_wrap(~insdc)
+  
 
 
 ```
 
-
-
-# Center Names {data-icon="ion-ios-people-outline"} 
-
-## Row {.tabset .tabset-fade}
-
-### Submission Centers
+### Europe Release/Update
 
 ```{r, fig.height=7, fig.width=9}
-source('fileexport.R')
+sequences <- bind_rows(sequpdate %>% mutate(type="Update"), seqrelease %>% mutate(type="Release"))
+sequences_df <- sequences %>% count(country,INSDC,type, sort=TRUE) %>% rename(region=country)
+seqhits <- inner_join(geo_loc, sequences_df)
+wseqhits <- inner_join(bind_rows(world.center,states.lab), sequences_df)
 
-metadata_clean %>% count(center_name, origin) %>% arrange(desc(n)) %>% mutate(center_name =fct_reorder(center_name, n)) %>%
-  hchart("bar", hcaes(x=center_name , y=n, group=origin)) %>% 
-  hc_exporting(
-    enabled = TRUE, 
-    filename="simple_column", 
-    formAttributes=list(target="_blank"),
-    buttons=list(contextButton=list(text="Export", 
-                                    theme=list(fill="transparent"),
-                                    menuItems=export)))
+
+mybreak <- seq(0,nrow(sequences),2000)
+mylabel <- paste(gsub("000","K",mybreak),"", sep="")
+ggplot() +
+  geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
+  geom_text(aes(x=long, y=lat, label = region), data = geo_loc,  size = 2, hjust = 0.5, family="Palatino") +
+  geom_point(aes(x=long, y=lat), data = seqhits,  size = 1, alpha=.9, colour="steelblue", hjust = 0.5, family="Palatino") +
+  geom_label_repel(data=seqhits, aes(x=long, y=lat , colour=INSDC,label=n), size=2, alpha=.9, box.padding = 0.3, show.legend=T)+
+  guides(shape=FALSE) +
+  #stat_summary_hex(
+  #  data=seqhits,
+  #  aes(long, lat, z=as.integer(n)),
+  # fun ="mean",
+  #  alpha = 0.7, 
+  #  bins=90
+  #) +
+  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + #ggthemes::theme_map() +
+  theme_void(base_family = "IBMPlexSans") + 
+  labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL ) + 
+  theme(plot.title= element_text(hjust=.5), 
+        legend.position = "bottom",
+        legend.text=element_text(size=rel(0.5))) + facet_wrap(~type)
 ```
 
 
-# Timeline {data-icon="fa-calendar"} 
+### World Release/Update
+
+```{r, fig.height=7, fig.width=9}
+
+sequences <- bind_rows(sequpdate %>% mutate(type="Update"), seqrelease %>% mutate(type="Release"))
+sequences_df <- sequences %>% count(country,INSDC,type, sort=TRUE) %>% rename(region=country)
+seqhits <- inner_join(geo_loc, sequences_df)
+wseqhits <- inner_join(bind_rows(world.center,states.lab), sequences_df)
+
+mybreak=seq(0,nrow(sequences),2000)
+mylabel=paste(gsub("000","",mybreak),"K", sep="")
+
+ggplot() + 
+  geom_map(data=world.map, map=world.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
+  geom_label_repel(data=wseqhits, aes(x=long, y=lat , colour=INSDC,label=n), size=2, alpha=.9, box.padding = 0.3, show.legend=T)+
+  geom_point(aes(x=long, y=lat), data = wseqhits,  size = 1, colour="steelblue",alpha=.9, hjust = 0.5, family="Palatino") +
+  guides(shape=FALSE) +
+  #stat_summary_hex(
+  #  data=wseqhits,
+  #  aes(long, lat, z=as.integer(n)),
+  #  fun ="mean",
+  #  alpha = 0.7, 
+  #  bins=90
+  #) +
+  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + ggthemes::theme_map() +
+  theme_void(base_family = "IBMPlexSans")+ 
+  labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL) + 
+  theme(plot.title= element_text(hjust=.5), 
+        legend.position = "bottom",
+        legend.text=element_text(size=rel(0.5))) + facet_wrap(~type)
+  
+
+```
+
+
+# Experiment {data-icon="fa-calendar"} 
 
 ## Row {.tabset .tabset-fade}
 
@@ -292,8 +375,8 @@ metadata_clean %>% count(center_name, origin) %>% arrange(desc(n)) %>% mutate(ce
 ```{r, fig.height=7, fig.width=9}
 source('fileexport.R')
 
-metadata_clean %>% count(first_public, origin) %>% hchart("column", hcaes(x=first_public , y=n, group=origin)) %>%
-    hc_exporting(
+experiment_clean %>% select(first_public, insdc) %>% group_by(first_public, insdc) %>% mutate(count=n()) %>% ungroup() %>% unique() %>% arrange(first_public) %>% group_by(insdc)  %>% mutate(cums=cumsum(count)) %>% ungroup()%>% hchart("line", hcaes(x=first_public, y=cums, group=insdc)) %>% 
+  hc_exporting(
     enabled = TRUE, 
     filename="simple_column", 
     formAttributes=list(target="_blank"),
@@ -305,17 +388,16 @@ metadata_clean %>% count(first_public, origin) %>% hchart("column", hcaes(x=firs
 ### Month
 
 ```{r, fig.height=7, fig.width=9}
-metadata_clean %>% 
-    mutate(monthly=floor_date(first_public, unit="month")) %>%
-    count(monthly, origin) %>% 
-    hchart("column", hcaes(x= monthly, y=n, group=origin))%>%
-    hc_exporting(
+experiment_clean %>% 
+    mutate(monthly=floor_date(first_public, unit="month")) %>% select(monthly, insdc) %>% group_by(monthly, insdc) %>% mutate(count=n()) %>% ungroup() %>% unique() %>% arrange(monthly) %>% group_by(insdc)  %>% mutate(cums=cumsum(count)) %>% ungroup()%>% hchart("line", hcaes(x=monthly, y=cums, group=insdc)) %>% 
+  hc_exporting(
     enabled = TRUE, 
     filename="simple_column", 
     formAttributes=list(target="_blank"),
     buttons=list(contextButton=list(text="Export", 
                                     theme=list(fill="transparent"),
                                     menuItems=export)))
+
 
 ```
 
@@ -324,11 +406,10 @@ metadata_clean %>%
 
 ```{r, fig.height=7, fig.width=9}
 
-metadata_clean %>% 
-    mutate(weekly=week(first_public)) %>%
-    count(weekly, origin) %>% 
-    hchart("column", hcaes(x= weekly, y=n, group=origin))%>%
-    hc_exporting(
+
+experiment_clean %>% 
+    mutate(weekly=week(first_public)) %>% select(weekly, insdc) %>% group_by(weekly, insdc) %>% mutate(count=n()) %>% ungroup() %>% unique() %>% arrange(weekly) %>% group_by(insdc)  %>% mutate(cums=cumsum(count)) %>% ungroup()%>% hchart("line", hcaes(x=weekly, y=cums, group=insdc)) %>% 
+  hc_exporting(
     enabled = TRUE, 
     filename="simple_column", 
     formAttributes=list(target="_blank"),
@@ -337,7 +418,46 @@ metadata_clean %>%
                                     menuItems=export)))
 
 
+
 ```
+
+# Release/Update {data-icon="fa-calendar"} 
+
+## Row {.tabset .tabset-fade}
+
+### Release
+```{r, fig.height=7, fig.width=9}
+source('fileexport.R')
+
+sequences %>% filter(str_detect(type, "Release")) %>% select(first_public, INSDC) %>% group_by(first_public, INSDC) %>% mutate(count=n()) %>% ungroup() %>% unique() %>% arrange(first_public) %>% group_by(INSDC)  %>% mutate(cums=cumsum(count)) %>% ungroup()%>%
+  mutate(INSDC = ifelse(is.na(INSDC), "None", INSDC)) %>%
+  hchart("line", hcaes(x=first_public, y=cums, group=INSDC))%>% hc_subtitle(text="Release") %>% 
+  hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+```
+
+### Updates
+```{r, fig.height=7, fig.width=9}
+source('fileexport.R')
+
+sequences %>% filter(str_detect(type, "Update")) %>% select(first_public, INSDC) %>% group_by(first_public, INSDC) %>% mutate(count=n()) %>% ungroup() %>% unique() %>% arrange(first_public) %>% group_by(INSDC)  %>% mutate(cums=cumsum(count)) %>% ungroup()%>%
+  mutate(INSDC = ifelse(is.na(INSDC), "None", INSDC)) %>%
+  hchart("line", hcaes(x=first_public, y=cums, group=INSDC))%>% hc_subtitle(text="Updates") %>% 
+  hc_exporting(
+    enabled = TRUE, 
+    filename="simple_column", 
+    formAttributes=list(target="_blank"),
+    buttons=list(contextButton=list(text="Export", 
+                                    theme=list(fill="transparent"),
+                                    menuItems=export)))
+```
+
+
 
 Platforms {data-icon="ion-erlenmeyer-flask"}
 =====================================     
@@ -348,14 +468,14 @@ Platforms {data-icon="ion-erlenmeyer-flask"}
 
 ```{r}
 
-metadata_clean %>% count(instrument_model, instrument_platform) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col() + coord_flip() 
+experiment_clean %>% count(instrument_model, instrument_platform) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col() + coord_flip() 
 ```
 
 ### Instrument platforms 
 
 ```{r}
 
-metadata_clean %>% count(instrument_model, instrument_platform, library_layout) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col( show.legend = FALSE) + coord_flip() + facet_grid(library_layout~instrument_platform, scales="free_x")
+experiment_clean %>% count(instrument_model, instrument_platform, library_layout) %>% mutate(instrument_model = fct_reorder(instrument_model, n)) %>% ggplot(aes(instrument_model, n, fill=instrument_platform)) + geom_col( show.legend = FALSE) + coord_flip() + facet_grid(library_layout~instrument_platform, scales="free_x")
 ```
 
 
@@ -369,25 +489,25 @@ Datasets {data-icon="ion-ios-cloud-download-outline"}
 
 ```{r}
 library(DT)
-datatable(metadata_clean, escape=FALSE)
+datatable(experiment_clean, escape=FALSE)
 ```          
 
 ### Advanced
 
 ```{r}
 
-datatable(metadata_clean, filter = 'top',  escape=FALSE,
+datatable(experiment_clean, filter = 'top',  escape=FALSE,
           options = list(   searchHighlight = TRUE, pageLength = 15 ))
 
 ```
 
 
-### Exporting
+### Exporting Experiment
 
 ```{r}
 library(DT)
 
-metadata_clean %>% datatable( extensions = 'Buttons',  escape=FALSE,
+experiment_clean %>% datatable( extensions = 'Buttons',  escape=FALSE,
                               options = list(  dom = 'Bfrtip',
                                                buttons = list( list(
                                                extend = 'collection',
@@ -396,3 +516,20 @@ metadata_clean %>% datatable( extensions = 'Buttons',  escape=FALSE,
 
 ```
 
+### Exporting Sequences releases
+
+```{r}
+library(DT)
+
+accession <- sequences$accession
+accession =  paste0('<a target=_blank href="',path, accession,'">', accession,'</a>' )
+sequences$accession <- accession
+
+sequences %>% datatable( extensions = 'Buttons',  escape=FALSE,
+                              options = list(  dom = 'Bfrtip',
+                                               buttons = list( list(
+                                               extend = 'collection',
+                                        buttons = list(list(extend='csv',filename='embl-ebi-covid-sequences.csv'),                                                                 list(extend='excel', filename = 'embl-ebi-covid-sequences.xlsx')),text="Download"
+                                            ))))
+
+```
