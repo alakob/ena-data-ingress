@@ -287,7 +287,7 @@ ggplot() +
     alpha = 0.7, 
     bins=90
   ) +
-  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + ggthemes::theme_map() +
+  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + # ggthemes::theme_map() +
   theme_void(base_family = "IBMPlexSans")+ 
   labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL) + 
   theme(plot.title= element_text(hjust=.5), 
@@ -355,7 +355,7 @@ ggplot() +
   #  alpha = 0.7, 
   #  bins=90
   #) +
-  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + ggthemes::theme_map() +
+  scale_fill_gradient(high="cyan3", breaks=mybreak, labels=mylabel) + # ggthemes::theme_map() +
   theme_void(base_family = "IBMPlexSans")+ 
   labs(x=NULL, y=NULL, fill=NULL, shape=NULL, colour=NULL) + 
   theme(plot.title= element_text(hjust=.5), 
