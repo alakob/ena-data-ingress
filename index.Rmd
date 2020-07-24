@@ -94,17 +94,23 @@ experiment_clean <- experiment %>% mutate(country=gsub(":.*","", country)) %>% t
     str_detect(center_name, fixed('fisabio',ignore_case = TRUE)) ~ 'Spain',
     str_detect(center_name, fixed('DR. RICARDO JORGE',ignore_case = TRUE)) ~ 'Portugal',
     str_detect(center_name, fixed('Colindale',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('Cardiff',ignore_case = TRUE)) ~ 'Wales',
+    str_detect(center_name, fixed('Wales',ignore_case = TRUE)) ~ 'Wales',
     str_detect(center_name, fixed('Quadram Institute Bioscience',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('University College London',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('University of Cambridge',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('University of Edinburgh',ignore_case = TRUE)) ~ 'Scotland',
-    str_detect(center_name, fixed('University of Glasgow',ignore_case = TRUE)) ~ 'Scotland',
-    str_detect(center_name, fixed('Liverpool Clinical Laboratories',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('University of Sheffield',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('London',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Cambridge',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Edinburgh',ignore_case = TRUE)) ~ 'Scotland',
+    str_detect(center_name, fixed('Glasgow',ignore_case = TRUE)) ~ 'Scotland',
+    str_detect(center_name, fixed('Liverpool',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Sheffield',ignore_case = TRUE)) ~ 'England',
     str_detect(center_name, fixed('Belfast Health',ignore_case = TRUE)) ~ 'Northern Ireland',
-    str_detect(center_name, fixed('University of Birmingham',ignore_case = TRUE)) ~ 'England',
-    str_detect(center_name, fixed('University of Exeter',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Birmingham',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Exeter',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Portsmouth',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('EMBL-EBI',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Northumbria',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('Cumbria',ignore_case = TRUE)) ~ 'England',
+    str_detect(center_name, fixed('SC',ignore_case = FALSE)) ~ 'England',
+    center_name %in% c('SUB7478134','SUB7604810','SUB7121476','SUB7373126')  ~ 'United States',
     # FOR NEW CENTER_NAME to COUNTRY MAPPING, un-comment  and fill in the following template
     #str_detect(center_name, fixed('CENTER_NAME',ignore_case = TRUE)) ~ 'COUNTRY'),
     TRUE ~ ifelse (!is.na(country), country, center_name)),
@@ -126,7 +132,6 @@ experiment_clean <- experiment %>% mutate(country=gsub(":.*","", country)) %>% t
     str_detect(origin, fixed('USA',ignore_case = TRUE)) ~ 'United States',
     TRUE ~ origin)) %>%
   mutate_if(is.character, factor)
-
 
 
 # few european countries
@@ -162,6 +167,7 @@ eu_countries <- eu.map %>% filter(!str_detect('UK', region)) %>%
   group_by(region) %>%
   summarize(long=mean(long), lat=mean(lat))
 
+hong_kong <- tibble(region="Hong Kong", long=114.177216, lat=22.302711)
 geo_loc <- bind_rows(uk_states, eu_countries)
 
 meta_df <- experiment_clean %>% count(origin,insdc, sort=TRUE) %>% rename(region=origin)
@@ -173,9 +179,11 @@ hits <- inner_join(geo_loc, meta_df)
 world.center  <- world.map %>%  group_by(region) %>%
         summarize(long=mean(long), lat=mean(lat))
 world.center <- bind_rows(world.center, uk_states) 
-whits <- inner_join(bind_rows(world.center,states.lab), meta_df)
+whits <- inner_join(bind_rows(world.center,states.lab, hong_kong), meta_df)
 
+```
 
+```{r}
 
 # Construct URL to ENA for each experiment.
 #path <- "http://www.ebi.ac.uk/ena/data/view/"
@@ -187,6 +195,7 @@ sample_accession =  paste0('<a target=_blank href="',path, sample_accession,'">'
 experiment_clean$experiment_accession <- experiment_accession
 experiment_clean$sample_accession <- sample_accession
 ```
+
 
 
 # Maps {data-icon="fa-map-marker"} 
@@ -297,6 +306,8 @@ ggplot() +
 
 
 ```
+
+
 
 ### Europe Release/Update
 
@@ -485,6 +496,23 @@ Datasets {data-icon="ion-ios-cloud-download-outline"}
 
 ## DT::datatable {.tabset .tabset-fade}
 
+
+### Export Exp. Mapview data
+
+
+```{r}
+library(DT)
+
+whits %>% rename(origin=region, number_experiment=n, submitted_to=insdc) %>%
+  datatable( extensions = 'Buttons',  escape=FALSE,
+                              options = list(  dom = 'Bfrtip',
+                                               buttons = list( list(
+                                               extend = 'collection',
+                                        buttons = list(list(extend='csv',filename='exp_mapview_data'),                                                                 list(extend='excel', filename = 'exp_mapview_data')),text="Download"
+                                            ))))
+
+```
+
 ### Basic
 
 ```{r}
@@ -502,7 +530,7 @@ datatable(experiment_clean, filter = 'top',  escape=FALSE,
 ```
 
 
-### Exporting Experiment
+### Export Experiment
 
 ```{r}
 library(DT)
@@ -516,7 +544,7 @@ experiment_clean %>% datatable( extensions = 'Buttons',  escape=FALSE,
 
 ```
 
-### Exporting Sequences releases
+### Export Sequences releases
 
 ```{r}
 library(DT)
