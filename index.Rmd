@@ -110,7 +110,11 @@ experiment_clean <- experiment %>% mutate(country=gsub(":.*","", country)) %>% t
     str_detect(center_name, fixed('Northumbria',ignore_case = TRUE)) ~ 'England',
     str_detect(center_name, fixed('Cumbria',ignore_case = TRUE)) ~ 'England',
     str_detect(center_name, fixed('SC',ignore_case = FALSE)) ~ 'England',
-    center_name %in% c('SUB7478134','SUB7604810','SUB7121476','SUB7373126')  ~ 'United States',
+    center_name %in% c('SUB7478134','SUB7604810','SUB7121476','SUB7373126','SUB7891493','SUB7904347','SUB7802513')  ~ 'United States',
+    str_detect(center_name, fixed('Centre for Clinical Infection and Diagnostics Research and Genomics Innovation Unit',ignore_case = FALSE)) ~ 'England',
+    str_detect(center_name, fixed('Barts Health',ignore_case = FALSE)) ~ 'England',
+    str_detect(center_name, fixed('KAUST', ignore_case = TRUE)) ~ 'Saudi Arabia',
+    
     # FOR NEW CENTER_NAME to COUNTRY MAPPING, un-comment  and fill in the following template
     #str_detect(center_name, fixed('CENTER_NAME',ignore_case = TRUE)) ~ 'COUNTRY'),
     TRUE ~ ifelse (!is.na(country), country, center_name)),
@@ -256,7 +260,7 @@ valueBox(platform_count, icon="ion-paintbucket")
 
 
 ```{r, fig.height=7, fig.width=9}
-mybreak=seq(0,nrow(experiment_clean),2000)
+mybreak=seq(0,nrow(experiment_clean),4000)
 mylabel=paste(gsub("000","",mybreak),"K", sep="")
 ggplot() +
   geom_map(data=eu.map, map=eu.map, aes(long, lat, map_id=region), color="white", fill="gray50", size = 0.5, alpha=0.2) + 
@@ -281,7 +285,7 @@ ggplot() +
 ### World Experiment
 
 ```{r, fig.height=7, fig.width=9}
-mybreak=seq(0,nrow(experiment_clean),2000)
+mybreak=seq(0,nrow(experiment_clean),4000)
 mylabel=paste(gsub("000","",mybreak),"K", sep="")
 
 ggplot() + 
@@ -497,7 +501,7 @@ Datasets {data-icon="ion-ios-cloud-download-outline"}
 ## DT::datatable {.tabset .tabset-fade}
 
 
-### Export Exp. Mapview data
+### Mapview data
 
 
 ```{r}
