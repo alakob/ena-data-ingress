@@ -2,6 +2,11 @@
 An interactive dashboard to visualize SARS-CoV2 data submission to the EMBL-EBI-ENA
 ![alt text](fig/docker_logo_horizontal.png)
 
+
+### Dashboard screenshot example
+![alt text](fig/dashboard_screenshot.png)
+
+
 ### Prerequisite.
 
 The open-source software Docker must be pre-installed for the proper functioning of the dashboard:  
